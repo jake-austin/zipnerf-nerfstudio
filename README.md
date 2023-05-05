@@ -1,6 +1,6 @@
 # zipnerf-nerfstudio
 
-currently borked. hoping to be less borked, extenal collaborators welcome, feel free to make a PR and / or an issue 
+currently borked. hoping to be less borked, extenal collaborators welcome, feel free to make a PR and / or an issue :)
 
 Notes:
 proposal sampling seems to work when substituted in the nerfacto method for the mipnerf360 proposal loss that nerfacto was using. 
