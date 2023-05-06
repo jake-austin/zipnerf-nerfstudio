@@ -7,7 +7,7 @@ dependencies=[
 ]
 
 [tool.setuptools.packages.find]
-include = ["zipnerf"]
+include = ["zipnerf*"]
 
 [project.entry-points.'nerfstudio.method_configs']
-zipnerf = 'zipnerf_config:zipnerf_method'
+zipnerf = 'zipnerf.zipnerf_config:zipnerf_method'
