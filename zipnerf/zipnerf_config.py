@@ -33,16 +33,16 @@ zipnerf_method = MethodSpecification(
         ),
         optimizers={
             "proposal_networks": {
-                "optimizer": AdamOptimizerConfig(lr=(1e-2) / 64, eps=1e-15),
+                "optimizer": AdamOptimizerConfig(lr=(1e-2), eps=1e-15),
                 "scheduler": None,
             },
             "fields": {
-                "optimizer": AdamOptimizerConfig(lr=(1e-2) / 64, eps=1e-15),
+                "optimizer": AdamOptimizerConfig(lr=(1e-2), eps=1e-15),
                 "scheduler": None,
             },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="viewer",
     ),
-    description="Neural Emission Absorption Fields",
+    description="Zipnerf",
 )

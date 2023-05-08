@@ -126,7 +126,7 @@ class ZipNeRFField(Field):
         )
 
         self.density_backbone = tcnn.Network(
-            n_input_dims=self.hashgrid_encoding.n_output_dims * 2,
+            n_input_dims=self.hashgrid_encoding.n_output_dims,# * 2,
             n_output_dims=1 + geo_feat_dim,
             network_config={
                 "otype": "FullyFusedMLP",
@@ -153,24 +153,24 @@ class ZipNeRFField(Field):
         """Computes and returns the densities."""
         assert len(ray_samples.shape) == 2, "Not coded for multiple batch dimensions yet"
         variance_scale = 0.35  # Standard deviation of gaussians is scaled by .35 as per the paper
-        n_multisamples = 1
+        n_multisamples = 7
 
-        gaussians = ray_samples.frustums.get_positions()
-        # [n_multisamples, B, 3]
-        # positions = torch.distributions.MultivariateNormal(gaussians.mean, gaussians.cov).sample(
-        #     torch.tensor([n_multisamples])
-        # )
-        positions = gaussians[None].expand(n_multisamples, -1, -1, -1)
+        positions = ray_samples.frustums.get_positions()
+        origins = ray_samples.frustums.origins
 
-        ts = torch.einsum("...ij,...ij->...i", positions, ray_samples.frustums.directions).unsqueeze(
+        ts = torch.einsum("...ij,...ij->...i", (positions - origins), ray_samples.frustums.directions).unsqueeze(
             -1
-        )  # [n_multisamples, B, n_raysamples, 1]
+        )  # [B, n_raysamples, 1]
         rs = cone_radius = (
             torch.sqrt(ray_samples.frustums.pixel_area) / 1.7724538509055159
         )  # radii of the cone at the samples
-        standard_deviations = variance_scale * rs * ts  # [n_multisamples, B, n_raysamples, 1]
 
-        # positions = positions + (standard_deviations * torch.randn_like(standard_deviations))
+        # [n_multisamples, B, n_raysamples, 1]
+        standard_deviations = variance_scale * rs * ts
+        standard_deviations = standard_deviations[None].expand(n_multisamples, -1, -1, -1)
+
+        # Multisamples are from an isotropic gaussian centered at the standard sample position
+        positions = positions + (standard_deviations * torch.randn_like(standard_deviations))
 
         # Calculate the resolution corresponding to each element of our hashgrid, which goes from lowest res
         # to highest res
@@ -192,16 +192,19 @@ class ZipNeRFField(Field):
         )
 
         assert features.shape == multisample_weights.shape, f"{features.shape} != {multisample_weights.shape}"
-        downweighted_features = features.mean(dim=0)  # (features * multisample_weights).mean(dim=0)
+        downweighted_features = (features * multisample_weights).mean(dim=0)
         featurized_weights = ((2 * multisample_weights.mean(dim=0)) - 1) * torch.sqrt(
             1 + (features.detach().mean(0) ** 2)
         )
-        downweighted_features = torch.cat([downweighted_features, featurized_weights], dim=-1)
+        downweighted_features = downweighted_features #torch.cat([downweighted_features, featurized_weights], dim=-1)
         _shape = downweighted_features.shape
 
         features = self.density_backbone(downweighted_features.view(-1, _shape[-1])).view(*_shape[:-1], -1)
 
         density_before_activation, base_mlp_out = torch.split(features, [1, self.geo_feat_dim], dim=-1)
+
+
+        # Everything below here is nerfacto code that we kept around
 
         # Make sure the tcnn gets inputs between 0 and 1.
         selector = ((positions > 0.0) & (positions < 1.0)).all(dim=-1)
